@@ -164,7 +164,7 @@ password patterns).
 cargo test
 ```
 
-63 tests: detectors, the mapping store, the MCP protocol layer, the CLI, the
+65 tests: detectors, the mapping store, the MCP protocol layer, the CLI, the
 install upgrade path, and the isolation checker.
 
 ## License
