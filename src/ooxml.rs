@@ -36,6 +36,24 @@ const TEXT_BEARING: &[&str] = &[
     "docProps/core.xml",
 ];
 
+/// Archive members holding embedded pictures.
+///
+/// A screenshot pasted into a Word document keeps its passwords as pixels, so
+/// the XML says nothing about them. "See the credentials in the screenshot
+/// below" is a real sentence in real documents, and without reading these the
+/// masking would confidently miss exactly what the reader was pointed at.
+const MEDIA_PREFIXES: &[&str] = &["word/media/", "xl/media/", "ppt/media/"];
+
+fn is_media_image(name: &str) -> bool {
+    if !MEDIA_PREFIXES.iter().any(|prefix| name.starts_with(prefix)) {
+        return false;
+    }
+    let lower = name.to_ascii_lowercase();
+    [".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".gif"]
+        .iter()
+        .any(|extension| lower.ends_with(extension))
+}
+
 pub fn is_ooxml(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
@@ -91,9 +109,20 @@ pub fn extract_text(path: &Path) -> Result<String> {
         .with_context(|| format!("{} is not a valid OOXML archive", path.display()))?;
 
     let mut collected = String::new();
+    let mut media = Vec::new();
+
     for index in 0..archive.len() {
         let mut entry = archive.by_index(index)?;
         let name = entry.name().to_string();
+
+        if is_media_image(&name) {
+            let mut bytes = Vec::new();
+            if entry.read_to_end(&mut bytes).is_ok() {
+                media.push((name, bytes));
+            }
+            continue;
+        }
+
         if !carries_text(&name) {
             continue;
         }
@@ -107,7 +136,54 @@ pub fn extract_text(path: &Path) -> Result<String> {
             text.to_string()
         })?;
     }
+
+    // Embedded pictures are read last, and labelled, so the agent can tell
+    // "this came out of a screenshot" from "this was written in the document".
+    for (name, bytes) in media {
+        if let Some(text) = ocr_media(&name, &bytes)
+            && !text.trim().is_empty()
+        {
+            collected.push_str(&format!("\n[text recognised in embedded image {name}]\n"));
+            collected.push_str(&text);
+            collected.push('\n');
+        }
+    }
+
     Ok(collected)
+}
+
+/// OCR one embedded picture, or None when that is not possible here.
+fn ocr_media(name: &str, bytes: &[u8]) -> Option<String> {
+    if !crate::ocr::available() {
+        return None;
+    }
+    // Vision reads from a file, so the bytes go to a temporary one that is
+    // removed immediately: it holds the user's data and must not linger.
+    let extension = std::path::Path::new(name)
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("png");
+    // One directory per call, not per process: two images being read at the
+    // same time would otherwise share a directory and the first to finish
+    // would delete it from under the second.
+    let dir = std::env::temp_dir().join(format!("anonym-media-{}-{}", std::process::id(), uniq()));
+    std::fs::create_dir_all(&dir).ok()?;
+    let scratch = dir.join(format!("image.{extension}"));
+    std::fs::write(&scratch, bytes).ok()?;
+    let text = crate::ocr::recognize_text(&scratch).ok();
+    // Remove the file first: the directory cannot go while it still holds one.
+    let _ = std::fs::remove_file(&scratch);
+    let _ = std::fs::remove_dir(&dir);
+    text
+}
+
+/// A per-call suffix, so two images in one document cannot collide.
+fn uniq() -> u128 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0)
 }
 
 /// Rewrite `source` into `dest`, transforming text nodes with `transform`.
@@ -289,6 +365,49 @@ mod tests {
             vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a],
             "media must be byte-identical"
         );
+    }
+
+    #[test]
+    fn ooxml_recognises_embedded_media_by_location_and_type() {
+        assert!(is_media_image("word/media/image1.png"));
+        assert!(is_media_image("xl/media/image2.JPG"));
+        assert!(is_media_image("ppt/media/shot.bmp"));
+        // Not media: an XML part, a font, and a picture outside a media folder.
+        assert!(!is_media_image("word/document.xml"));
+        assert!(!is_media_image("word/fonts/font1.odttf"));
+        assert!(!is_media_image("customXml/image1.png"));
+    }
+
+    #[test]
+    fn ooxml_leaves_no_temporary_copy_of_an_embedded_image_behind() {
+        // The scratch file holds the user's picture, so it must not survive the
+        // call that created it.
+        //
+        // Counting every anonym-media directory would be flaky: tests run in
+        // parallel and another one may legitimately hold its own while this
+        // one looks. So this checks the directories created *by this call*,
+        // identified by the ones that appear and then must disappear.
+        let before = temp_media_dirs();
+        let _ = ocr_media("word/media/image1.png", &[0x42, 0x4d, 0x00]);
+        let after = temp_media_dirs();
+
+        let leaked: Vec<&String> = after.difference(&before).collect();
+        assert!(
+            leaked.is_empty(),
+            "an embedded image was left in the temp directory: {leaked:?}"
+        );
+    }
+
+    fn temp_media_dirs() -> std::collections::HashSet<String> {
+        std::fs::read_dir(std::env::temp_dir())
+            .map(|entries| {
+                entries
+                    .filter_map(|entry| entry.ok())
+                    .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                    .filter(|name| name.starts_with("anonym-media-"))
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     #[test]

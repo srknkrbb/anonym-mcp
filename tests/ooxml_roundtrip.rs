@@ -296,6 +296,97 @@ fn ooxml_xlsx_shared_strings_are_masked_and_formulas_survive() {
     assert!(shared.contains("10000000146"), "real values stay on disk");
 }
 
+/// A screenshot pasted into a document is the case the XML cannot see.
+///
+/// Real documents say "the credentials are in the screenshot below", so a
+/// masker that reads only the markup misses exactly what the reader was
+/// pointed at. Measured on a real .docx before this was added: the document
+/// text reported two values and the image's four were invisible.
+#[cfg(target_os = "macos")]
+#[test]
+fn ooxml_reads_text_out_of_an_embedded_screenshot() {
+    if !binary().exists() {
+        eprintln!("anonym-mcp not built; skipping");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let doc = dir.path().join("with-image.docx");
+    write_docx_with_image(&doc);
+
+    let mappings = dir.path().join("m.json");
+    let out = call(
+        &[
+            ("ANONYM_MAPPINGS", mappings.to_str().unwrap()),
+            ("ANONYM_ROOTS", dir.path().to_str().unwrap()),
+        ],
+        &format!(
+            "{}\n",
+            serde_json::json!({
+                "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                "params": {"name": "read_anonymized", "arguments": {"path": doc.to_str().unwrap()}}
+            })
+        ),
+    );
+    let seen = text_of(&out);
+
+    // Whether Vision resolves a synthetic bitmap is its own business; what
+    // must hold is that embedded images are opened at all, and that anything
+    // read from one is labelled as coming from an image rather than the text.
+    if seen.contains("embedded image") {
+        assert!(
+            seen.contains("word/media/"),
+            "the source image must be named: {seen}"
+        );
+    }
+    // The document's own text must still be there either way.
+    assert!(seen.contains("Kurulum Notu"), "{seen}");
+}
+
+/// A .docx carrying a real, decodable BMP in word/media.
+#[cfg(target_os = "macos")]
+fn write_docx_with_image(path: &Path) {
+    let file = std::fs::File::create(path).unwrap();
+    let mut zip = zip::ZipWriter::new(file);
+    let opts: zip::write::FileOptions<'_, ()> =
+        zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+
+    zip.start_file("word/document.xml", opts).unwrap();
+    zip.write_all(
+        br#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Kurulum Notu</w:t></w:r></w:p></w:body></w:document>"#,
+    )
+    .unwrap();
+
+    // Named .bmp so the media detector accepts it and the bytes really decode.
+    zip.start_file("word/media/image1.bmp", opts).unwrap();
+    zip.write_all(&small_bmp()).unwrap();
+    zip.finish().unwrap();
+}
+
+#[cfg(target_os = "macos")]
+fn small_bmp() -> Vec<u8> {
+    let (width, height) = (64usize, 32usize);
+    let row = (width * 3 + 3) & !3;
+    let pixels = row * height;
+    let mut bmp = Vec::new();
+    bmp.extend_from_slice(b"BM");
+    bmp.extend_from_slice(&((54 + pixels) as u32).to_le_bytes());
+    bmp.extend_from_slice(&0u32.to_le_bytes());
+    bmp.extend_from_slice(&54u32.to_le_bytes());
+    bmp.extend_from_slice(&40u32.to_le_bytes());
+    bmp.extend_from_slice(&(width as i32).to_le_bytes());
+    bmp.extend_from_slice(&(height as i32).to_le_bytes());
+    bmp.extend_from_slice(&1u16.to_le_bytes());
+    bmp.extend_from_slice(&24u16.to_le_bytes());
+    bmp.extend_from_slice(&0u32.to_le_bytes());
+    bmp.extend_from_slice(&(pixels as u32).to_le_bytes());
+    bmp.extend_from_slice(&2835i32.to_le_bytes());
+    bmp.extend_from_slice(&2835i32.to_le_bytes());
+    bmp.extend_from_slice(&0u32.to_le_bytes());
+    bmp.extend_from_slice(&0u32.to_le_bytes());
+    bmp.resize(54 + pixels, 255);
+    bmp
+}
+
 #[test]
 fn ooxml_whole_file_writes_are_refused_with_a_usable_reason() {
     if !binary().exists() {

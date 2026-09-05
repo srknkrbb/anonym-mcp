@@ -156,7 +156,7 @@ A project config overrides a same-named global entry. If the global entry has no
 | Kind | How | Reversible |
 |---|---|---|
 | Text: `txt`, `csv`, `md`, `json`, `xml`, `yaml`, `log`, `env`, `sql`, ... | Direct | Yes |
-| Office: `docx`, `xlsx`, `pptx` (+ `docm`, `xlsm`, `dotx`, ...) | XML text nodes only, so formatting, tables and formulas survive | Yes, via `edit_restored` |
+| Office: `docx`, `xlsx`, `pptx` (+ `docm`, `xlsm`, `dotx`, ...) | XML text nodes, plus OCR over embedded pictures | Yes, via `edit_restored` |
 | `pdf` with a text layer | Text extraction | No |
 | Scanned `pdf` | Pages rendered and read with OCR | No |
 | Images: `png`, `jpg`, `tiff`, `bmp`, `heic`, ... | Vision OCR | No |
@@ -166,6 +166,12 @@ refused for them, because writing a string over a `.docx` replaces a document
 with a text file. `edit_restored` rewrites the document in place. Note that Word
 splits text across runs, so a phrase spanning a formatting change will not match
 as one string; the error says so rather than reporting a silent no-op.
+
+Pictures pasted into a document are read too. "The credentials are in the
+screenshot below" is a real sentence in real documents, and a masker that reads
+only the markup misses precisely what the reader was pointed at: on a real
+.docx, the text held two sensitive values and the embedded screenshot held four
+more. Anything recovered that way is labelled with the image it came from.
 
 Images and PDFs are **one-way**. Their text is pixels and layout, so there is
 nothing to write a real value back into; both refuse writes with that reason.
@@ -192,8 +198,8 @@ password patterns). OCR is asked for Turkish first, then English.
 cargo test
 ```
 
-98 tests: detectors, the mapping store, the MCP protocol layer, OOXML round
-trips against real Word and Excel output, PDF and OCR classification, the CLI,
+101 tests: detectors, the mapping store, the MCP protocol layer, OOXML round
+trips against real Word and Excel output, PDF and OCR classification, embedded-image extraction, the CLI,
 the install upgrade path, and the isolation checker.
 
 ## License

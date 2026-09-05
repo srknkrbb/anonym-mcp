@@ -60,7 +60,7 @@ fn build_pdf(body: &str) -> Vec<u8> {
     let stream = format!("BT /F1 12 Tf 40 700 Td ({body}) Tj ET");
     let mut pdf = String::from("%PDF-1.4\n");
     let mut offsets = Vec::new();
-    let mut push = |pdf: &mut String, offsets: &mut Vec<usize>, object: String| {
+    let push = |pdf: &mut String, offsets: &mut Vec<usize>, object: String| {
         offsets.push(pdf.len());
         pdf.push_str(&object);
     };
