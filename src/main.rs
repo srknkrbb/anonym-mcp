@@ -13,6 +13,7 @@
 
 mod anonymize;
 mod detectors;
+mod ooxml;
 mod store;
 mod tools;
 

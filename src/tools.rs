@@ -80,8 +80,7 @@ impl Server {
     pub fn read_anonymized(&mut self, args: &Value) -> Result<String> {
         let path = arg_str(args, "path")?;
         let path = self.check_path(Path::new(&path))?;
-        let raw = std::fs::read_to_string(&path)
-            .with_context(|| format!("reading {}", path.display()))?;
+        let raw = read_document_text(&path)?;
         let (masked, report) = anonymize_text(&raw, &self.settings, &mut self.store);
         self.store.save()?;
 
@@ -103,6 +102,16 @@ impl Server {
         let path = arg_str(args, "path")?;
         let content = arg_str(args, "content")?;
         let path = self.check_path(Path::new(&path))?;
+        if crate::ooxml::is_ooxml(&path) {
+            // A .docx is an archive, not a string. Writing the agent's text
+            // over it would replace a document with a text file, so the edit
+            // has to be expressed as an edit, not as a whole-file write.
+            bail!(
+                "{} is an OOXML document; use edit_restored to change its text, \
+                 which rewrites the document in place and preserves formatting",
+                path.display()
+            );
+        }
         let (restored_text, restored) = restore_text(&content, &self.store);
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).ok();
@@ -129,6 +138,18 @@ impl Server {
 
         let (old_real, _) = restore_text(&old, &self.store);
         let (new_real, restored) = restore_text(&new, &self.store);
+
+        if crate::ooxml::is_ooxml(&path) {
+            let replacements = edit_ooxml(&path, &old_real, &new_real)?;
+            return Ok(format!(
+                "Edited {} ({replacements} replacement{} in the document text, \
+                 {restored} placeholder{} restored; formatting preserved)",
+                path.display(),
+                if replacements == 1 { "" } else { "s" },
+                if restored == 1 { "" } else { "s" }
+            ));
+        }
+
         let content = std::fs::read_to_string(&path)
             .with_context(|| format!("reading {}", path.display()))?;
 
@@ -199,6 +220,52 @@ impl Server {
             other => bail!("unknown tool: {other}"),
         }
     }
+}
+
+/// Replace text inside an OOXML document, in place, preserving structure.
+///
+/// The replacement runs per text node. A phrase split across two runs (Word
+/// does this freely, mid-word, when formatting changes) will not match, and
+/// saying so is better than a silent no-op that leaves the agent believing the
+/// edit landed.
+fn edit_ooxml(path: &Path, old: &str, new: &str) -> Result<usize> {
+    let mut replacements = 0;
+    let temp = path.with_extension("anonym-tmp");
+    crate::ooxml::transform_document(path, &temp, |text| {
+        if text.contains(old) {
+            replacements += text.matches(old).count();
+            text.replace(old, new)
+        } else {
+            text.to_string()
+        }
+    })?;
+
+    if replacements == 0 {
+        let _ = std::fs::remove_file(&temp);
+        bail!(
+            "old_string not found in the text of {}. Note that Word splits \
+             text across runs, so a phrase spanning a formatting change cannot \
+             be matched as one string; try a shorter fragment",
+            path.display()
+        );
+    }
+
+    // Swap in only after a successful rewrite, so a failure cannot destroy the
+    // user's document.
+    std::fs::rename(&temp, path).with_context(|| format!("replacing {}", path.display()))?;
+    Ok(replacements)
+}
+
+/// Read a document's user-visible text, whatever its container.
+///
+/// A .docx is a zip of XML, so `read_to_string` on one returns either a UTF-8
+/// error or a pile of markup. Each format gets the extraction that suits it,
+/// and the detectors then see prose in every case.
+fn read_document_text(path: &Path) -> Result<String> {
+    if crate::ooxml::is_ooxml(path) {
+        return crate::ooxml::extract_text(path);
+    }
+    std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))
 }
 
 /// Refuse character devices and other non-regular files.
