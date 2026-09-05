@@ -112,6 +112,7 @@ impl Server {
                 path.display()
             );
         }
+        reject_pixel_write(&path)?;
         let (restored_text, restored) = restore_text(&content, &self.store);
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).ok();
@@ -138,6 +139,8 @@ impl Server {
 
         let (old_real, _) = restore_text(&old, &self.store);
         let (new_real, restored) = restore_text(&new, &self.store);
+
+        reject_pixel_write(&path)?;
 
         if crate::ooxml::is_ooxml(&path) {
             let replacements = edit_ooxml(&path, &old_real, &new_real)?;
@@ -222,6 +225,36 @@ impl Server {
     }
 }
 
+/// Refuse to write text into a format whose text is pixels.
+///
+/// An image's words live in the bitmap, so there is nothing to substitute: the
+/// masking is one-way. Attempting it produced "stream did not contain valid
+/// UTF-8", which tells the agent nothing about why the operation makes no
+/// sense. Say so instead, and say what to do about it.
+fn reject_pixel_write(path: &Path) -> Result<()> {
+    if crate::ocr::is_image(path) {
+        bail!(
+            "{} is an image: its text is pixels, so masking it is one-way and \
+             there is nothing to write back. read_anonymized still reports what \
+             the image contains; edit the source document instead.",
+            path.display()
+        );
+    }
+    if path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("pdf"))
+    {
+        bail!(
+            "{} is a PDF: its layout is not reconstructable from text, so this \
+             server will not rewrite one. read_anonymized reports what it \
+             contains; edit the source document instead.",
+            path.display()
+        );
+    }
+    Ok(())
+}
+
 /// Replace text inside an OOXML document, in place, preserving structure.
 ///
 /// The replacement runs per text node. A phrase split across two runs (Word
@@ -265,7 +298,64 @@ fn read_document_text(path: &Path) -> Result<String> {
     if crate::ooxml::is_ooxml(path) {
         return crate::ooxml::extract_text(path);
     }
+    if crate::ocr::is_image(path) {
+        return crate::ocr::recognize_text(path);
+    }
+    if crate::pdf::is_pdf(path) {
+        return read_pdf_text(path);
+    }
     std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))
+}
+
+/// A PDF's text, falling back to OCR when there is no text layer.
+///
+/// The empty result from a scanned page is the trap: it is indistinguishable
+/// from a clean document, so a scan full of national IDs would be reported as
+/// having nothing in it. Either OCR reads the pages, or the answer carries a
+/// warning that says so plainly.
+fn read_pdf_text(path: &Path) -> Result<String> {
+    let extracted = crate::pdf::extract(path)?;
+    if extracted.source == crate::pdf::Source::TextLayer {
+        return Ok(extracted.text);
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // Vision refuses a PDF file directly ("zero-dimensioned image"), so
+        // the pages are rendered to bitmaps first. Handing it the PDF was the
+        // original bug: OCR silently returned nothing and the scan read as
+        // clean.
+        if let Ok(pages) = crate::pdfrender::render_pages(path) {
+            let mut recognized = Vec::new();
+            for page in &pages {
+                if let Ok(items) = crate::ocr::recognize_cgimage(page) {
+                    recognized.extend(items.into_iter().map(|item| item.text));
+                }
+            }
+            let text = recognized.join("\n");
+            if !text.trim().is_empty() {
+                let truncation = if crate::pdfrender::truncated(path) {
+                    format!(
+                        "\n\n(Only the first {} pages were read; the rest of this \
+                         document has NOT been examined.)",
+                        crate::pdfrender::MAX_PAGES
+                    )
+                } else {
+                    String::new()
+                };
+                return Ok(format!(
+                    "{text}{}{truncation}",
+                    crate::pdf::provenance_note(crate::pdf::Source::NeedsOcr, true)
+                ));
+            }
+        }
+    }
+
+    Ok(format!(
+        "{}{}",
+        extracted.text,
+        crate::pdf::provenance_note(crate::pdf::Source::NeedsOcr, crate::ocr::available())
+    ))
 }
 
 /// Refuse character devices and other non-regular files.

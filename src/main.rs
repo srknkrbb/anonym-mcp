@@ -13,7 +13,11 @@
 
 mod anonymize;
 mod detectors;
+mod ocr;
 mod ooxml;
+mod pdf;
+#[cfg(target_os = "macos")]
+mod pdfrender;
 mod store;
 mod tools;
 
