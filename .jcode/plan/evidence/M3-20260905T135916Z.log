@@ -1,0 +1,26 @@
+$ cargo test --manifest-path anonym-mcp/Cargo.toml --bin anonym-mcp pdf
+exit: 0
+
+--- stdout ---
+
+running 12 tests
+test pdf::tests::pdf_extension_is_recognised ... ok
+test pdf::tests::pdf_note_is_silent_for_an_ordinary_text_pdf ... ok
+test pdf::tests::pdf_note_says_when_text_came_from_ocr ... ok
+test pdf::tests::pdf_note_warns_loudly_when_a_scan_cannot_be_read ... ok
+test pdf::tests::pdf_reports_a_missing_file_rather_than_empty_text ... ok
+test pdf::tests::pdf_rejects_a_file_that_is_not_a_pdf_instead_of_returning_nothing ... ok
+test pdf::tests::pdf_classifies_a_page_with_almost_no_text_as_needing_ocr ... ok
+test pdf::tests::pdf_classifies_a_page_of_prose_as_having_a_text_layer ... ok
+test pdfrender::tests::pdfrender_reports_no_page_count_for_a_broken_file ... ok
+test pdfrender::tests::pdfrender_refuses_a_file_that_is_not_a_pdf ... ok
+test pdfrender::tests::pdfrender_does_not_claim_truncation_for_a_short_document ... ok
+test pdfrender::tests::pdfrender_renders_a_real_page_to_a_bitmap ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 63 filtered out; finished in 0.04s
+
+
+--- stderr ---
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running unittests src/main.rs (anonym-mcp/target/debug/deps/anonym_mcp-90e4502efe49aa18)
+CoreGraphics PDF has logged an error. Set environment variable "CG_PDF_VERBOSE" to learn more.

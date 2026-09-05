@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "project_name": "anonym-mcp",
+  "goal": "anonym-mcp masks OOXML, PDF and image content as well as plain text, matching AnonymKit's coverage.",
+  "percent": 100,
+  "verified": 6,
+  "unverified_done": 0,
+  "in_progress": 0,
+  "blocked": 0,
+  "remaining": 0,
+  "current_milestone_id": "M1",
+  "milestones": [
+    {
+      "id": "M1",
+      "title": "OOXML handler",
+      "status": "done",
+      "percent": 100,
+      "task_count": 2,
+      "verified": 2,
+      "unverified_done": 0
+    },
+    {
+      "id": "M2",
+      "title": "OCR and image redaction",
+      "status": "done",
+      "percent": 100,
+      "task_count": 2,
+      "verified": 2,
+      "unverified_done": 0
+    },
+    {
+      "id": "M3",
+      "title": "PDF handling",
+      "status": "done",
+      "percent": 100,
+      "task_count": 2,
+      "verified": 2,
+      "unverified_done": 0
+    }
+  ],
+  "runnable_task_ids": [],
+  "in_progress_task_ids": [],
+  "issues": []
+}

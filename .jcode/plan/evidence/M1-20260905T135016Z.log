@@ -1,0 +1,55 @@
+$ cargo test --manifest-path anonym-mcp/Cargo.toml ooxml
+exit: 0
+
+--- stdout ---
+
+running 7 tests
+test ooxml::tests::ooxml_extensions_are_recognised ... ok
+test ooxml::tests::ooxml_leaves_indentation_whitespace_untouched ... ok
+test ooxml::tests::ooxml_never_transforms_attributes_or_tag_names ... ok
+test ooxml::tests::ooxml_transforms_text_nodes_and_leaves_markup_alone ... ok
+test ooxml::tests::ooxml_extracts_only_text_bearing_members ... ok
+test ooxml::tests::ooxml_rejects_a_file_that_is_not_an_archive ... ok
+test ooxml::tests::ooxml_rewrites_a_document_and_keeps_other_members ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 51 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+
+running 5 tests
+test ooxml_whole_file_writes_are_refused_with_a_usable_reason ... ok
+test ooxml_edit_that_matches_nothing_explains_the_run_splitting_trap ... ok
+test ooxml_docx_is_masked_without_exposing_markup ... ok
+test ooxml_xlsx_shared_strings_are_masked_and_formulas_survive ... ok
+test ooxml_edit_keeps_the_archive_valid_and_every_member_intact ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+
+--- stderr ---
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running unittests src/main.rs (anonym-mcp/target/debug/deps/anonym_mcp-b46268451c130624)
+     Running tests/cli.rs (anonym-mcp/target/debug/deps/cli-5c7b1d8304fd9124)
+     Running tests/install_upgrade.rs (anonym-mcp/target/debug/deps/install_upgrade-79b70c5bfa35c692)
+     Running tests/isolation_checker.rs (anonym-mcp/target/debug/deps/isolation_checker-857e2834208dc91d)
+     Running tests/mcp_client.rs (anonym-mcp/target/debug/deps/mcp_client-2bf67f8cd95bd55f)
+     Running tests/ooxml_roundtrip.rs (anonym-mcp/target/debug/deps/ooxml_roundtrip-0798a2e13f90b08d)

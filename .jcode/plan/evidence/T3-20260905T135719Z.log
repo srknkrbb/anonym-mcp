@@ -1,0 +1,20 @@
+$ cargo test --manifest-path anonym-mcp/Cargo.toml --bin anonym-mcp ocr
+exit: 0
+
+--- stdout ---
+
+running 7 tests
+test ocr::tests::ocr_availability_matches_the_platform ... ok
+test ocr::tests::ocr_recognises_image_extensions ... ok
+test ocr::tests::ocr_reports_a_missing_file_instead_of_returning_nothing ... ok
+test pdf::tests::pdf_note_says_when_text_came_from_ocr ... ok
+test pdf::tests::pdf_classifies_a_page_with_almost_no_text_as_needing_ocr ... ok
+test ocr::tests::ocr_on_a_file_that_is_not_an_image_fails_rather_than_pretending ... ok
+test ocr::tests::ocr_reads_text_out_of_a_generated_image ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 68 filtered out; finished in 0.24s
+
+
+--- stderr ---
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s
+     Running unittests src/main.rs (anonym-mcp/target/debug/deps/anonym_mcp-90e4502efe49aa18)

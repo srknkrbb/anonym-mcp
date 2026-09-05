@@ -1,0 +1,20 @@
+$ cargo test --manifest-path anonym-mcp/Cargo.toml --bin anonym-mcp ooxml
+exit: 0
+
+--- stdout ---
+
+running 7 tests
+test ooxml::tests::ooxml_extensions_are_recognised ... ok
+test ooxml::tests::ooxml_leaves_indentation_whitespace_untouched ... ok
+test ooxml::tests::ooxml_never_transforms_attributes_or_tag_names ... ok
+test ooxml::tests::ooxml_transforms_text_nodes_and_leaves_markup_alone ... ok
+test ooxml::tests::ooxml_rejects_a_file_that_is_not_an_archive ... ok
+test ooxml::tests::ooxml_extracts_only_text_bearing_members ... ok
+test ooxml::tests::ooxml_rewrites_a_document_and_keeps_other_members ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 51 filtered out; finished in 0.00s
+
+
+--- stderr ---
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running unittests src/main.rs (anonym-mcp/target/debug/deps/anonym_mcp-b46268451c130624)
