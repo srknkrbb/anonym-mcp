@@ -410,6 +410,45 @@ mod tests {
             .unwrap_or_default()
     }
 
+    /// Embedded pictures live under a different prefix in each format, and an
+    /// audit found xlsx was the untested one: a spreadsheet saying "screenshot
+    /// attached" carried its credentials in xl/media where nothing looked.
+    #[test]
+    fn ooxml_finds_embedded_media_in_word_excel_and_powerpoint() {
+        for name in [
+            "word/media/image1.png",
+            "xl/media/image1.png",
+            "ppt/media/image1.png",
+        ] {
+            assert!(is_media_image(name), "{name} must be treated as media");
+        }
+    }
+
+    #[test]
+    fn ooxml_extracts_media_from_a_spreadsheet_not_just_a_document() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("book.xlsx");
+        {
+            let file = std::fs::File::create(&path).unwrap();
+            let mut zip = zip::ZipWriter::new(file);
+            let opts: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+            zip.start_file("xl/sharedStrings.xml", opts).unwrap();
+            zip.write_all(
+                br#"<?xml version="1.0"?><sst><si><t>Ekran goruntusu ektedir</t></si></sst>"#,
+            )
+            .unwrap();
+            zip.start_file("xl/media/image1.png", opts).unwrap();
+            zip.write_all(&[0x89, b'P', b'N', b'G']).unwrap();
+            zip.finish().unwrap();
+        }
+
+        // The spreadsheet's own text must come through; whether the stub image
+        // yields any OCR text is Vision's business, not this test's.
+        let text = extract_text(&path).unwrap();
+        assert!(text.contains("Ekran goruntusu ektedir"), "{text}");
+    }
+
     #[test]
     fn ooxml_rejects_a_file_that_is_not_an_archive() {
         let dir = tempfile::tempdir().unwrap();

@@ -84,6 +84,17 @@ e-mail addresses, phone numbers, person names, and your own word list.
 A number that fails its checksum is left alone: masking it would teach you to
 distrust the output.
 
+Password detection needs either a label (`password:`, `şifre=`) or a
+password-shaped token: letters, digits and a special character together. A bare
+username like `admin01` matches neither, and deliberately so, since a rule
+loose enough to catch it would mask ordinary words throughout the document.
+AnonymKit leaves it too. Use `ANONYM_WORDS` for account names, project
+codenames and anything else specific to your data:
+
+```json
+"ANONYM_WORDS": "admin01,Acme Holding,Projekt Kiraz"
+```
+
 | Variable | Default | Meaning |
 |---|---|---|
 | `ANONYM_MAPPINGS` | `~/.anonym-mcp/mappings.json` | Mapping table location (written `0600`) |
@@ -198,7 +209,7 @@ password patterns). OCR is asked for Turkish first, then English.
 cargo test
 ```
 
-101 tests: detectors, the mapping store, the MCP protocol layer, OOXML round
+104 tests: detectors, the mapping store, the MCP protocol layer, OOXML round
 trips against real Word and Excel output, PDF and OCR classification, embedded-image extraction, the CLI,
 the install upgrade path, and the isolation checker.
 

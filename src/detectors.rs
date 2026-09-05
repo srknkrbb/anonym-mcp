@@ -487,6 +487,28 @@ mod tests {
         );
     }
 
+    /// A bare username is not a password, and must not be treated as one.
+    ///
+    /// Found by auditing real screenshots: `admin01` stayed in the clear. That
+    /// is correct, since a rule loose enough to catch it would mask ordinary
+    /// words, but it means account names need the custom word list. Both halves
+    /// are asserted here so neither can drift.
+    #[test]
+    fn detects_leaves_bare_usernames_alone_but_custom_words_catch_them() {
+        assert!(
+            kinds("User Name : admin01").is_empty(),
+            "a bare username must not be mistaken for a password"
+        );
+
+        let settings = Settings {
+            custom_words: vec!["admin01".to_string()],
+            ..Settings::default()
+        };
+        let found = detect("User Name : admin01", &settings);
+        assert_eq!(found.len(), 1, "the word list must reach it");
+        assert_eq!(found[0].kind, Kind::CustomWord);
+    }
+
     #[test]
     fn detects_skip_existing_placeholders() {
         assert!(is_placeholder("TCKN_1"));
