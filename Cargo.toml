@@ -1,0 +1,29 @@
+[package]
+name = "anonym-mcp"
+version = "0.1.0"
+edition = "2024"
+description = "MCP server that masks sensitive values in files before an AI agent sees them, and restores them on write"
+license = "MIT"
+repository = "https://github.com/srknkrbb/anonym-mcp"
+readme = "README.md"
+keywords = ["mcp", "privacy", "anonymization", "pii", "redaction"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "anonym-mcp"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dirs = "5"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
