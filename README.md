@@ -11,6 +11,9 @@ The mapping table never leaves the machine.
 It speaks [MCP](https://modelcontextprotocol.io) over stdio, so it works with
 any MCP-capable agent: Claude Code, Cursor, jcode, or your own.
 
+Handles plain text, Office documents, PDFs and images, including scans and
+screenshots that carry their secrets as pixels.
+
 ```
 agent:  ad,tckn,eposta
         Ali,TCKN_1,EPOSTA_1
@@ -148,15 +151,40 @@ file either. Verified.
 A project config overrides a same-named global entry. If the global entry has no
 `ANONYM_ROOTS`, every directory without its own config gets an unbounded server.
 
+## Formats
+
+| Kind | How | Reversible |
+|---|---|---|
+| Text: `txt`, `csv`, `md`, `json`, `xml`, `yaml`, `log`, `env`, `sql`, ... | Direct | Yes |
+| Office: `docx`, `xlsx`, `pptx` (+ `docm`, `xlsm`, `dotx`, ...) | XML text nodes only, so formatting, tables and formulas survive | Yes, via `edit_restored` |
+| `pdf` with a text layer | Text extraction | No |
+| Scanned `pdf` | Pages rendered and read with OCR | No |
+| Images: `png`, `jpg`, `tiff`, `bmp`, `heic`, ... | Vision OCR | No |
+
+Office documents are edited through their structure: `write_restored` is
+refused for them, because writing a string over a `.docx` replaces a document
+with a text file. `edit_restored` rewrites the document in place. Note that Word
+splits text across runs, so a phrase spanning a formatting change will not match
+as one string; the error says so rather than reporting a silent no-op.
+
+Images and PDFs are **one-way**. Their text is pixels and layout, so there is
+nothing to write a real value back into; both refuse writes with that reason.
+`read_anonymized` still tells you what they contain.
+
+Every OCR result says it came from OCR, because recognition is fallible and a
+value it misread is a value it did not mask. A PDF with no readable text says
+so loudly rather than reading as a clean document: an empty result is exactly
+what a scan full of credentials looks like. Documents beyond the 50-page render
+cap disclose that only part was examined.
+
+OCR needs Apple's Vision framework, so images and scanned PDFs are macOS only.
+Everything else works everywhere.
+
 ## Limits
 
-Text formats only: `txt`, `csv`, `tsv`, `md`, `json`, `xml`, `yaml`, `log`,
-`ini`, `conf`, `env`, `sql`, `html`, `properties`. Files above 256 KB, images and
-binaries are not handled. No OOXML, PDF or OCR support yet.
-
-The detectors are tuned for Turkish data (TCKN checksums, TR IBANs, TR phone
+Files above 256 KB are not embedded. The detectors are tuned for Turkish data (TCKN checksums, TR IBANs, TR phone
 formats) plus formats that are the same everywhere (e-mail, credit cards,
-password patterns).
+password patterns). OCR is asked for Turkish first, then English.
 
 ## Development
 
@@ -164,8 +192,9 @@ password patterns).
 cargo test
 ```
 
-65 tests: detectors, the mapping store, the MCP protocol layer, the CLI, the
-install upgrade path, and the isolation checker.
+98 tests: detectors, the mapping store, the MCP protocol layer, OOXML round
+trips against real Word and Excel output, PDF and OCR classification, the CLI,
+the install upgrade path, and the isolation checker.
 
 ## License
 
